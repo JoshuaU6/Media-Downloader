@@ -1,3 +1,7 @@
+import eventlet
+
+eventlet.monkey_patch()
+
 from flask import (
     Flask,
     request,
@@ -8,11 +12,13 @@ from flask import (
     after_this_request,
 )
 from flask_socketio import SocketIO, emit
+from flask_cors import CORS
 from utils import format_duration, format_size, get_download_dir
 import yt_dlp
 import os
 
 app = Flask(__name__)
+CORS(app)  # Enable Cross-Origin Requests
 socketio = SocketIO(app)
 
 
@@ -112,4 +118,5 @@ def download_file(filename):
 
 
 if __name__ == "__main__":
-    socketio.run(app, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    socketio.run(app, debug=False, host="0.0.0.0", port=port, server=eventlet)
