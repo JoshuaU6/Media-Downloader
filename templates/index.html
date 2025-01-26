@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Video Downloader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
+      integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+  </head>
+
+  <body class="min-h-screen flex items-center justify-center py-14">
+    <div
+      class="w-full max-w-[1440px] bg-[#c3e3fa] shadow-md rounded mx-auto p-6 border-[#2856a5]"
+    >
+      <h1 class="text-3xl font-bold mb-4 text-center text-[#264b82]">
+        Video Downloader
+      </h1>
+      <form id="url-form" class="w-full lg:w-[80%] mx-auto">
+        <label for="url" class="block text-sm font-medium text-[#1b2e50]"
+          >Video URL:
+        </label>
+        <div class="flex flex-col md:flex-row gap-4 md:gap-10">
+          <input
+            type="text"
+            id="url"
+            name="url"
+            class="mt-1 block w-full border border-[#9bd1f5] rounded-md shadow-sm focus:ring-[#53a1ea] focus:border-[#53a1ea] focus-visible:ring-[#53a1ea] focus-visible:border-[#53a1ea] sm:text-sm py-2 px-4 bg-[#f0f8fe]"
+            required
+          />
+
+          <button
+            type="submit"
+            class="bg-[#6bb8ef] min-w-max hover:bg-[#2a6acb] text-[#f0f8fe] font-bold py-1 px-4 rounded transition duration-300 disabled:cursor-not-allowed"
+          >
+            <i
+              id="loading-spinner"
+              class="fa-duotone fa-solid fa-spinner animate-spin hidden mr-2"
+            ></i>
+            Get Downloading Options
+          </button>
+        </div>
+      </form>
+
+      <!-- Thumbnail and Title Section -->
+      <div
+        id="video-info"
+        class="hidden mt-6 w-full grid-cols-3 gap-4 bg-gray-800 rounded p-4"
+      >
+        <div class="">
+          <img
+            id="video-thumbnail"
+            src=""
+            alt="Video Thumbnail"
+            class="w-full h-auto mb-4 rounded"
+          />
+        </div>
+        <div id="formats-container" class="hidden mt-6 col-span-2">
+          <div class="border-b border-b-[#2856a5] py-2">
+            <h2 id="video-title" class="text-xl font-bold text-[#337fdd]"></h2>
+            <p id="video-duration" class="text-[#6bb8ef]"></p>
+          </div>
+
+          <h2 class="text-xl font-bold mb-4 text-center text-[#53a1ea]">
+            Select Format
+          </h2>
+          <div class="flex flex-col gap-4">
+            <div
+              id="audio-formats"
+              class="mb-4 py-4 border-b border-b-[#6bb8ef]"
+            >
+              <h3 class="text-lg font-bold mb-2 text-[#53a1ea]">
+                Audio Formats
+              </h3>
+              <ul
+                id="audio-formats-list"
+                class="flex items-center gap-4 flex-wrap"
+              ></ul>
+            </div>
+            <div id="video-formats">
+              <h3 class="text-lg font-bold mb-2 text-[#53a1ea]">
+                Video Formats
+              </h3>
+              <ul
+                id="video-formats-list"
+                class="flex items-center gap-4 flex-wrap"
+              ></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress Bar -->
+      <div
+        id="progress-container"
+        class="hidden w-full bg-gray-200 rounded mt-4"
+      >
+        <div
+          id="progress-bar"
+          class="bg-blue-500 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded-l"
+        >
+          0%
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const socket = io();
+
+      socket.on("connect", () => {
+        console.log("Connected to server");
+      });
+
+      socket.on("disconnect", () => {
+        console.log("Disconnected from server");
+      });
+
+      document
+        .getElementById("url-form")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+          // Show the loading spinner and disable the button
+          document.getElementById("loading-spinner").classList.remove("hidden");
+          const submitButton = e.target.querySelector("button[type='submit']");
+          submitButton.disabled = true;
+
+          const url = document.getElementById("url").value;
+          const response = await fetch("/formats", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ url }),
+          });
+          const data = await response.json();
+
+          // Hide the spinner and re-enable the button
+          document.getElementById("loading-spinner").classList.add("hidden");
+          submitButton.disabled = false;
+          submitButton.textContent = "Get Downloading Options";
+
+          // Update the thumbnail and title
+          document.getElementById("video-thumbnail").src = data.thumbnail;
+          document.getElementById("video-title").textContent = data.title;
+          document.getElementById("video-duration").textContent = data.duration;
+
+          // Show video info section
+          document.getElementById("video-info").classList.remove("hidden");
+          document.getElementById("video-info").classList.add("xl:grid");
+
+          const formatsContainer = document.getElementById("formats-container");
+          const audioFormatsList =
+            document.getElementById("audio-formats-list");
+          const videoFormatsList =
+            document.getElementById("video-formats-list");
+
+          audioFormatsList.innerHTML = "";
+          videoFormatsList.innerHTML = "";
+
+          const audioButton = document.createElement("button");
+          audioButton.type = "button";
+          audioButton.className =
+            "bg-[#53a1ea] hover:bg-[#2a6acb] text-white font-bold py-2 px-4 rounded";
+          audioButton.textContent = "Download as MP3";
+          audioButton.onclick = () =>
+            downloadFormat(data.url, "bestaudio", "audio");
+          audioFormatsList.appendChild(audioButton);
+
+          data.formats.forEach((format) => {
+            const li = document.createElement("li");
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className =
+              "w-full bg-[#53a1ea] hover:bg-[#2a6acb] text-white font-bold py-2 px-4 rounded";
+            button.textContent = `${format.format_id} - ${format.ext} - ${
+              format.resolution || format.abr
+            } - ${format.filesize ? format.filesize_human : "N/A"}`;
+            button.onclick = () =>
+              downloadFormat(data.url, format.format_id, "video");
+
+            li.appendChild(button);
+            if (format.vcodec === "none") {
+              audioFormatsList.appendChild(li);
+            } else {
+              videoFormatsList.appendChild(li);
+            }
+          });
+
+          formatsContainer.classList.remove("hidden");
+        });
+
+      socket.on("progress", (data) => {
+        console.log("Progress data received:", data); // Check if progress data is received
+
+        if (data.status === "downloading") {
+          const percentage = Math.round(
+            (data.downloaded_bytes / data.total_bytes) * 100
+          );
+          const progressBar = document.getElementById("progress-bar");
+          progressBar.style.width = percentage + "%";
+          progressBar.textContent = percentage + "%";
+        }
+      });
+
+      socket.on("download_complete", (data) => {
+        window.location.href = data.download_url;
+      });
+
+      async function downloadFormat(url, format_id, type) {
+        // Hide the video-info section
+        document.getElementById("video-info").classList.add("hidden");
+
+        // Emit a download event to the server with the necessary data
+        socket.emit("download", { url, format_id, type });
+
+        // Show the progress bar when the download starts
+        document
+          .getElementById("progress-container")
+          .classList.remove("hidden");
+      }
+    </script>
+  </body>
+</html>
